@@ -24,3 +24,24 @@ def non_dimensionalize(x,y):
     xy = (xy - mean) / sd
     x, y = xy[:,0], xy[:,1]
     return x, y
+
+def get_A(N, kx):
+    h = 1/N
+    A = np.zeros((N, N))
+    A[0, 0] = h**2
+    for i in range(1, N-1):
+        A[i, i-1] = kx[i]
+        A[i, i]   = -2 * kx[i]
+        A[i, i+1] = kx[i]
+    A[-1, -1] = h**2
+    A /= h**2
+    return A
+
+def get_b(N):
+    b = np.ones(N)
+    b[0] = 0
+    b[-1] = 0
+    return b
+
+def get_coeffs():
+    return 10 ** (np.random.rand(4) * 4 - 2)

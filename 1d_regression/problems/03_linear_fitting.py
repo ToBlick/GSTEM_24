@@ -53,3 +53,4 @@ display(VBox([m_slider, b_slider, out]))
 update(m0, b0)
 
 #TODO: Determine (roughly) the values of m and b that minimize the error by hand
+# %%

@@ -17,7 +17,7 @@ x_train, y_train = x.reshape(-1, 1), y.reshape(-1, 1)
 
 from sklearn.neural_network import MLPRegressor
 
-MLP = MLPRegressor(hidden_layer_sizes=(10,10,10),       # Number of neurons in the hidden layer(s)
+MLP = MLPRegressor(hidden_layer_sizes=(10,10,10),   # Number of neurons in the hidden layer(s)
                    activation='tanh',               # Activation function: {‘identity’, ‘logistic’, ‘tanh’, ‘relu’}
                    solver='adam',                   # {‘lbfgs’, ‘sgd’, ‘adam’}
                    alpha=0.0001,                    # L2 regularization term
