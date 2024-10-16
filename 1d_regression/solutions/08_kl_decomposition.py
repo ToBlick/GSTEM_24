@@ -56,7 +56,6 @@ evd = np.linalg.eig(u_array.T @ u_array)
 lambdas = np.real(evd.eigenvalues)
 V = np.real(evd.eigenvectors)
 
-
 # %%
 
 #TODO: Print the first 5 eigenvalues
@@ -65,7 +64,7 @@ print(lambdas[:5])
 # %%
 #TODO: Plot the first 5 eigenvectors
 
-plt.plot(x, V[:, :5])
+plt.plot(x, np.sqrt(lambdas[:10]) * V[:, :10])
 plt.show()
 
 # %%
@@ -88,18 +87,31 @@ plt.show()
 # An Eigenvalue of size < 1e-10 is considered zero.
 # Generate random coefficients and solve the system. Time the solve-step.
 
+
+
+m = 4
 coeffs = get_coeffs()
 kx = k(x)
 A = get_A(N, kx)
 b = get_b(N)
 
-A_tilde = V[:,:4].T @ A @ V[:,:4]
-b_tilde = V[:,:4].T @ b
+A_tilde = V[:,:m].T @ A @ V[:,:m]
+b_tilde = V[:,:m].T @ b
 
 start_time = time.time()
 c = np.linalg.solve(A_tilde, b_tilde)
 end_time = time.time()
 print(f"Solving took {end_time - start_time} seconds.")
+
+# %%
+# single mode:
+# v is the mode
+# u is the target
+# find c such that c * v = u
+# c = u * v / (v * v)
+
+# multiple modes:
+# find c_1, c_2, c_3, ... such that c_1 * v_1 + c_2 * v_2 + c_3 * v_3 + ... = u
 
 # %%
 # TODO: For the same coefficients, solve the full system A u = b. Time it.
@@ -111,10 +123,12 @@ print(f"Solving took {end_time - start_time} seconds.")
 # %%
 #TODO: Compare the two solutions by plotting them. You can reconstruct the full solution using u_reconstructed = V c, again using only the non-zero Eigenvectors.
 
-u_reconstructed = V[:,:4] @ c
+u_reconstructed = V[:,:m] @ c
+u_projected = V[:,:m] @ V[:,:m].T @ u
 
 plt.plot(x, u, label="Full solution")
 plt.plot(x, u_reconstructed, label="Reconstructed solution")
+plt.plot(x, u_projected, label="Projected solution")
 plt.legend()
 plt.show()
 # %%
@@ -122,3 +136,5 @@ plt.show()
 #TODO: Plot the difference between the two solutions.
 plt.plot(x, u - u_reconstructed)
 # %%
+
+

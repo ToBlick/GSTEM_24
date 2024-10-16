@@ -127,6 +127,8 @@ coeffs_array = np.array(coeffs_list)
 
 #TODO: Plot the solutions u_list (you can set alpha=0.5 for a neater plot)
 plt.plot(x, u_array.T, alpha = 0.5)
+#plt.yscale('log')
+#plt.ylim(1e-4, 1e1)
 plt.show()
 
 # %%
@@ -143,8 +145,8 @@ plt.show()
 plt.scatter(np.mean(coeffs_array, axis=1), -u_average, color='c')
 plt.xlabel('mean of the coefficients')
 plt.ylabel('u_average')
-plt.yscale('log')
-plt.xscale('log')
+#plt.yscale('log')
+#plt.xscale('log')
 plt.show()
 
 # %%
