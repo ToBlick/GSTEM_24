@@ -8,7 +8,7 @@ domain = ((0, 1), (0, 1))
 d = 2 # dimension
 n = 4 # number of basis functions per dimension
 n_s = jnp.arange(n**d) # number of basis functions (linear indexing)
-nx = 256 # number of points for plotting
+nx = 128 # number of points for plotting
 
 # source term
 def p(x):
@@ -59,20 +59,28 @@ phi_v = jit(vmap(phi, (0, None)))
 x_1 = jnp.linspace(domain[0][0], domain[0][1], nx)
 x_2 = jnp.linspace(domain[1][0], domain[1][1], nx)
 x = jnp.array(jnp.meshgrid(x_1, x_2)).reshape(d, nx**2).T
-# x.shape is now (nx^2, d)
 
-# ϕ_0(x) = sin(pi * x_1) * sin(pi * x_2) / 2
+# quadrature points
+h1 = (domain[0][1] - domain[0][0]) / (nx - 1)
+h2 = (domain[1][1] - domain[1][0]) / (nx - 1)
+x_q_1 = jnp.linspace(domain[0][0] + h1/2, domain[0][1] - h1/2, (nx-1))
+x_q_2 = jnp.linspace(domain[1][0] + h2/2, domain[1][1] - h2/2, (nx-1))
+x_q = jnp.array(jnp.meshgrid(x_q_1, x_q_2)).reshape(d, (nx-1)**2).T
+# x_q.shape is now ((nx-1)^2, d)
+
+# ϕ_(n-1)(x) = cos((n-1) * pi * x_1) * cos(0 * pi * x_2) / 2
 phi_hat = jnp.zeros(n**d).at[n-1].set(1)
-plt.contourf(x_1, x_2, phi_v(x, phi_hat).reshape(nx, nx) )
+plt.contourf(x_1, x_2, phi_v(x, phi_hat).reshape(nx, nx), levels=50)
 plt.colorbar()
 # %%
-# ϕ_(2*n+3)(x) = cos(3 * pi * x_1) * cos(4 * pi * x_2) / 2
+# ϕ_(2*n+3)(x) = cos(3 * pi * x_1) * cos(3 * pi * x_2) / 2
 phi_hat = jnp.zeros(n**d).at[2*n+3].set(1)
-plt.contourf(x_1, x_2, phi_v(x, phi_hat).reshape(nx, nx) )
+plt.contourf(x_1, x_2, phi_v(x, phi_hat).reshape(nx, nx), levels=50)
 plt.colorbar()
 # %%
 
 ### Jax magic
+@jit
 def laplace_phi(x, phi_hat):
     # take derivative only with respect to x
     H = jax.hessian(phi, argnums=0)(x, phi_hat)
@@ -89,12 +97,12 @@ grad_phi_v = jit(vmap(grad_phi, in_axes=(0, None)))
 # Δϕ_(2*n+3)(x) = Δ (cos(3 * pi * x_1) * cos(4 * pi * x_2)) / 2
 #               = - (9 + 16) * pi^2 * cos(3 * pi * x_1) * cos(4 * pi * x_2) / 2
 phi_hat = jnp.zeros(n**d).at[2*n+3].set(1)
-plt.contourf(x_1, x_2, laplace_phi_v(x, phi_hat).reshape(nx, nx) )
+plt.contourf(x_1, x_2, laplace_phi_v(x, phi_hat).reshape(nx, nx), levels=50)
 plt.colorbar()
-print(
-    jnp.sum((laplace_phi_v(x, phi_hat) -
-             - 25 * jnp.pi**2 * phi_v(x, phi_hat))**2) / nx**2
-)
+# print(
+#     jnp.sum((laplace_phi_v(x_q, phi_hat) -
+#              - 25 * jnp.pi**2 * phi_v(x_q, phi_hat))**2) / (nx-1)**2
+# )
 # %%
 
 # L2 projection onto the space spanned by the basis functions
@@ -117,9 +125,9 @@ def get_phi_hat(f, x):
     return vmap(l2_basis_i, (None, 0, None))(f, n_s, x)
     
 # check for p:
-p_hat = get_phi_hat(p, x)
+p_hat = get_phi_hat(p, x_q)
 print(
-    jnp.sum((vmap(p)(x) - phi_v(x, p_hat))**2) / nx**2
+    jnp.sum((vmap(p)(x_q) - phi_v(x_q, p_hat))**2) / (nx-1)**2
 )
 
 # %%
@@ -143,7 +151,7 @@ def _K(i,j,x):
     return -jnp.sum(gradϕ_i * gradϕ_j) / x.shape[0]
 
 # assemble
-K = vmap(vmap(_K, (0, None, None)), (None, 0, None))(n_s, n_s, x)
+K = vmap(vmap(_K, (0, None, None)), (None, 0, None))(n_s, n_s, x_q)
 plt.imshow(K)
 plt.colorbar()
 # Note: Diagonal matrix, why?
@@ -152,7 +160,7 @@ plt.colorbar()
 # K[0,0] is zero, this corresponds to the un-defined constant.
 # To set it to zero, enforce w[0] = 0
 K = K.at[0,0].set(1)
-p_hat = get_phi_hat(p, x)
+p_hat = get_phi_hat(p, x_q)
 p_hat = p_hat.at[0].set(0)
 
 # Solve the system for w:
@@ -161,11 +169,11 @@ w = jnp.linalg.solve(K, p_hat)
 u_h = vmap(lambda x: phi(x, w))
 
 # plot the solution and print error
-plt.contourf(x_1, x_2, u_h(x).reshape(nx, nx) )
+plt.contourf(x_1, x_2, u_h(x).reshape(nx, nx), levels=50)
 plt.colorbar()
 print(
-    jnp.sum((u_h(x) -
-             - 1/(25 * jnp.pi**2) * phi_v(x, p_hat))**2) / nx**2
+    jnp.sum((u_h(x_q) -
+             - 1/(25 * jnp.pi**2) * phi_v(x_q, p_hat))**2) / (nx-1)**2
 )
 # %%
 
@@ -190,7 +198,7 @@ def residual(w, p, x):
 
 # sanity check: the gradient of the residual at the solution should be zero
 
-print( jnp.sum ((jax.grad(residual, argnums=0)(w, p, x)**2) ) / w.shape[0] )
+print( jnp.sum ((jax.grad(residual, argnums=0)(w, p, x_q)**2) ) / w.shape[0] )
 
 # %%
 
@@ -208,16 +216,18 @@ solver = optax.lbfgs(
 # have to jit this for performance
 @jit
 def objective(params):
-    return residual(params, p, x)
+    return residual(params, p, x_q)
 # initial guess, can take the L2 projection
 params = get_phi_hat(p, x).at[0].set(0)
 opt_state = solver.init(params)
 value_and_grad = optax.value_and_grad_from_state(objective)
 
 # optimization loop 
-# (this takes forever because of the laplacian, we only do 10 iterations)
-for _ in range(10):
+# (this takes forever because of the laplacian, we only do 100 iterations)
+for _ in range(100):
     value, grad = value_and_grad(params, state=opt_state)
+    if jnp.sum( grad**2 ) < 1e-6:
+        break
     updates, opt_state = solver.update(
         grad, opt_state, params, value=value, 
         grad=grad, value_fn=objective
@@ -227,32 +237,34 @@ for _ in range(10):
 # %%
 # plot this solution
 u_h_optax = vmap(lambda x: phi(x, params))
-plt.contourf(x_1, x_2, u_h_optax(x).reshape(nx, nx) )
+plt.contourf(x_1, x_2, u_h_optax(x).reshape(nx, nx), levels=50)
+print(
+    jnp.sum((u_h(x_q) - u_h_optax(x_q))**2) / (nx-1)**2
+)
 # %%
 
 # Do a more interesting problem (a few localized sources)
-key = jax.random.PRNGKey(0)
+key = jax.random.PRNGKey(1)
 def q(x):
-    nc = 10
-    cs = jax.random.uniform(key, (nc, 2), minval=0.2, maxval=0.8)
+    nc = 5
+    cs = jax.random.uniform(key, (nc, 2), minval=0.1, maxval=0.9)
     r = 0
     # could vmap this to parallelize... but ok.
     for c in cs:
-        r += jnp.exp(- 1/ (2 * 0.01) * ((x[0] - c[0])**2 + (x[1] - c[1])**2))
+        r += jnp.exp(- 1/ (2 * 0.001) * ((x[0] - c[0])**2 + (x[1] - c[1])**2))
     return r
-plt.contourf(x_1, x_2, vmap(q)(x).reshape(nx, nx) )
+plt.contourf(x_1, x_2, vmap(q)(x).reshape(nx, nx), levels=50)
 plt.colorbar()
 
 # %%
 # project the source term
-q_hat = get_phi_hat(q, x)
+q_hat = get_phi_hat(q, x_q)
 # set the undefined constant to zero
 q_hat = q_hat.at[0].set(0)
 # solve the system
 w = jnp.linalg.solve(K, q_hat)
-# solve
-u_h = vmap(lambda x: phi(x, w))
 # plot
-plt.contourf(x_1, x_2, u_h(x).reshape(nx, nx) )
+u_h = vmap(lambda x: phi(x, w))
+plt.contourf(x_1, x_2, u_h(x).reshape(nx, nx), levels=50)
 plt.colorbar()
 # %%
