@@ -1,4 +1,6 @@
 import numpy as np
+import jax.numpy as jnp
+from jax import random
 
 def generate_data(N=1000, epsilon=20, seed=42, unitless=False):
     np.random.seed(seed)
@@ -7,6 +9,12 @@ def generate_data(N=1000, epsilon=20, seed=42, unitless=False):
     if unitless:
         x, y = non_dimensionalize(x, y)
     return x, y
+
+def generate_data_jax(key, N=1000, epsilon=10):
+    x_key, xi_key = random.split(key)
+    x = 10 * random.normal(x_key, (N,)) + 7
+    y = 3*x + 4 * x * jnp.sin(x/10) + epsilon * random.normal(xi_key, (N,))
+    return x / 100, y / 200
 
 def l2_error(x, y, m, b):
     return np.sum((y - (m*x + b))**2) / len(y)
